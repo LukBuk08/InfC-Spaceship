@@ -1,138 +1,196 @@
 import pygame
 import random
 import sys
+import math
 
 # Initialize Pygame
 pygame.init()
 
 # Screen dimensions
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-
-# Colors
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
+SCREEN_WIDTH, SCREEN_HEIGHT = pygame.display.get_desktop_sizes()[0]
 
 # Create screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+pygame.display.toggle_fullscreen()
 pygame.display.set_caption("Space Invaders")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 36)
 
-# Player class
-class Player(pygame.sprite.Sprite):
+# World
+class World():
     def __init__(self):
-        super().__init__()
-        self.image = pygame.Surface((50, 40))
-        self.image.fill(GREEN)
-        self.rect = self.image.get_rect()
-        self.rect.centerx = SCREEN_WIDTH // 2
-        self.rect.bottom = SCREEN_HEIGHT - 10
-        self.speed = 5
+        self.width = SCREEN_WIDTH*3
+        self.height = SCREEN_HEIGHT*3
+        self.surface = pygame.Surface((self.width,self.height))
+        
+        self.sprite = pygame.transform.scale(pygame.image.load("bg.png").convert_alpha(),(self.width,self.height))
+        #self.sprite = pygame.Surface((self.width,self.height))
+        '''
+        for i in range(self.width):
+            for j in range(self.height):
+                self.sprite.set_at((i,self.height-j),(255/self.width*i,0,255/self.height*j))
+        '''
 
-    def update(self):
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT] and self.rect.left > 0:
-            self.rect.x -= self.speed
-        if keys[pygame.K_RIGHT] and self.rect.right < SCREEN_WIDTH:
-            self.rect.x += self.speed
+# Player class
+class Player():
+    def __init__(self,x:int,y:int,width,height,color):
+        
+        self.width = width
+        self.height = height
+        self.surface = pygame.Surface((width,height))
+        self.x = x
+        self.y = y
+        self.vel_x = 0
+        self.vel_y = 0
+        self.speed_increment = 5
+        self.max_speed = 10
+        self.drag = 0.8
 
-    def shoot(self):
-        bullet = Bullet(self.rect.centerx, self.rect.top)
-        all_sprites.add(bullet)
-        bullets.add(bullet)
+        for i in range(0,self.width+1):
+            for j in range(0,self.height+1):
+                self.surface.set_at((i,self.height-j),(0,255/self.width*i,255/self.height*j))
 
-# Enemy class
-class Enemy(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.Surface((40, 40))
-        self.image.fill(RED)
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-        self.speed = 2
+class Enemy():
+    def __init__(self):
+        
+        self.x = 100
+        self.y = 100
 
-    def update(self):
-        self.rect.y += self.speed
+        self.vel_x = 0
+        self.vel_y = 0
 
-# Bullet class
-class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.Surface((5, 15))
-        self.image.fill(WHITE)
-        self.rect = self.image.get_rect()
-        self.rect.centerx = x
-        self.rect.bottom = y
-        self.speed = -7
+        self.surface = pygame.Surface((50,50))
+        self.surface.fill("white")
 
-    def update(self):
-        self.rect.y += self.speed
-        if self.rect.bottom < 0:
-            self.kill()
+        for i in range(50):
+            for j in range(50):
+                self.surface.set_at((i,49-j),(255/50*i,255/50*j,0))
 
-# Sprite groups
-all_sprites = pygame.sprite.Group()
-enemies = pygame.sprite.Group()
-bullets = pygame.sprite.Group()
+class Camera():
+    def __init__(self,player_x:int,player_y:int):
+        
+        self.rect = pygame.Rect(player_x - SCREEN_WIDTH//2, player_y-SCREEN_HEIGHT//2,
+                                SCREEN_WIDTH,SCREEN_HEIGHT)
+        self.vel_x = 0
+        self.vel_y = 0
+        self.speed_increment = 5
+        self.drag = 0.5
+        self.max_follow_distance = 20
 
-# Create player
-player = Player()
-all_sprites.add(player)
 
-# Game variables
-score = 0
-spawn_timer = 0
+    def update(self,player_x:int,player_y:int,player_speed):
+        
+        dx = self.rect.x - (player_x - SCREEN_WIDTH//2)
+        dy = self.rect.y - (player_y - SCREEN_HEIGHT//2)  
+    
+        angle = math.atan2(dx,dy)
+        
+        if not -self.max_follow_distance < dx < self.max_follow_distance:
+            self.vel_x += math.sin(angle) * self.speed_increment
+            
+        if not -self.max_follow_distance < dy < self.max_follow_distance:
+            self.vel_y += math.cos(angle) * self.speed_increment
+            
+
+        self.vel_x = max(min(self.vel_x,player_speed),-player_speed)
+        self.vel_y = max(min(self.vel_y,player_speed),-player_speed)
+        
+        self.rect.x -= int(self.vel_x)
+        self.rect.y -= int(self.vel_y)
+
+        self.vel_x = self.vel_x*self.drag
+        self.vel_y = self.vel_y*self.drag
+        
+        
+    
+
+        
+        
+       
+        #---camera locked to player
+        #self.rect.x = player_x - SCREEN_WIDTH//2
+        #self.rect.y = player_y - SCREEN_HEIGHT//2
+
+def draw_text(text,x,y,world):
+    world.surface.blit(font.render(f"{round(text,2)}",1,"black"),(x,y))
 
 # Game loop
-running = True
-while running:
-    clock.tick(60)
 
-    # Event handling
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                player.shoot()
+def main():
 
-    # Update sprites
-    all_sprites.update()
+    world = World()
+    enemy = Enemy()
+    player = Player(world.width//2, world.height//2,50,50,"red")
+    camera = Camera(player_x=player.x,player_y=player.y)
 
-    # Spawn enemies
-    spawn_timer += 1
-    if spawn_timer > 30:
-        enemy = Enemy(random.randint(0, SCREEN_WIDTH - 40), 0)
-        all_sprites.add(enemy)
-        enemies.add(enemy)
-        spawn_timer = 0
+    running = True
 
-    # Check for collisions
-    hits = pygame.sprite.groupcollide(enemies, bullets, True, True)
-    for hit in hits:
-        score += 10
-        enemy = Enemy(random.randint(0, SCREEN_WIDTH - 40), 0)
-        all_sprites.add(enemy)
-        enemies.add(enemy)
+    player_moving = False
 
-    # Check if enemy reached bottom
-    for enemy in enemies:
-        if enemy.rect.top > SCREEN_HEIGHT:
-            enemy.kill()
+    while running:
+        clock.tick(60)
 
-    # Draw
-    screen.fill(BLACK)
-    all_sprites.draw(screen)
+        # Event handling
 
-    # Draw score
-    score_text = font.render(f"Score: {score}", True, WHITE)
-    screen.blit(score_text, (10, 10))
+        keys = pygame.key.get_pressed()
 
-    pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+        
 
+
+#---------Player input--------------
+        if keys[pygame.K_w]:
+            player.vel_y -= player.speed_increment
+            player_moving = True
+
+        if keys[pygame.K_s]:
+            player.vel_y += player.speed_increment
+            player_moving = True
+
+        if keys[pygame.K_a]:
+            player.vel_x -= player.speed_increment
+            player_moving = True
+
+        if keys[pygame.K_d]:
+            player.vel_x += player.speed_increment
+            player_moving = True
+
+        player.vel_x = max(min(player.vel_x,player.max_speed),-player.max_speed)
+        player.vel_y = max(min(player.vel_y,player.max_speed),-player.max_speed)
+
+        player.x += player.vel_x
+        player.y += player.vel_y
+        
+        player.vel_x *= player.drag
+        player.vel_y *= player.drag
+        
+        
+#------------------------------------
+
+#--------------Draw everything----------------
+        
+
+        world.surface.blit(world.sprite,(0,0))
+        world.surface.blit(enemy.surface,(enemy.x,enemy.y))
+        world.surface.blit(player.surface,(player.x,player.y))
+
+        camera.update(player.x+player.width//2, player.y+player.height//2, player.max_speed)
+
+        screen.blit(world.surface,(0,0),camera.rect)
+        
+        
+#-----------------------------------------------
+
+#------------Update------------
+        pygame.display.flip()
+#------------------------------
+
+main()
 pygame.quit()
 sys.exit()
