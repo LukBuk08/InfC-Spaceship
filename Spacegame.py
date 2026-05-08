@@ -24,7 +24,7 @@ class World():
         self.height = SCREEN_HEIGHT*3
         self.surface = pygame.Surface((self.width,self.height))
         
-        self.sprite = pygame.transform.scale(pygame.image.load("bg.png").convert_alpha(),(self.width,self.height))
+        self.sprite = pygame.transform.scale(pygame.image.load("unnamed lol 2.png").convert_alpha(),(self.width,self.height))
         #self.sprite = pygame.Surface((self.width,self.height))
         '''
         for i in range(self.width):
@@ -35,7 +35,7 @@ class World():
 # Player class
 class Player():
     def __init__(self,x:int,y:int,width,height,color):
-        
+        self.moving=0
         self.width = width
         self.height = height
         self.surface = pygame.Surface((width,height))
@@ -46,6 +46,8 @@ class Player():
         self.speed_increment = 5
         self.max_speed = 10
         self.drag = 0.8
+        self.diagonal_speed = int(math.sqrt(self.max_speed*self.max_speed/2))
+        
 
         for i in range(0,self.width+1):
             for j in range(0,self.height+1):
@@ -79,8 +81,8 @@ class Camera():
         self.max_follow_distance = 20
 
 
-    def update(self,player_x:int,player_y:int,player_speed):
-        
+    def update(self,player_x:int,player_y:int,player_speed, world):
+
         dx = self.rect.x - (player_x - SCREEN_WIDTH//2)
         dy = self.rect.y - (player_y - SCREEN_HEIGHT//2)  
     
@@ -102,6 +104,8 @@ class Camera():
         self.vel_x = self.vel_x*self.drag
         self.vel_y = self.vel_y*self.drag
         
+        self.rect.x = min(max(0,self.rect.x), world.width -self.rect.width)
+        self.rect.y = min(max(0,self.rect.y), world.height -self.rect.height)
         
     
 
@@ -145,21 +149,27 @@ def main():
 
 
 #---------Player input--------------
+        player.moving = 0
+
         if keys[pygame.K_w]:
             player.vel_y -= player.speed_increment
-            player_moving = True
+            player.moving += 1
 
         if keys[pygame.K_s]:
             player.vel_y += player.speed_increment
-            player_moving = True
+            player.moving += 1
 
         if keys[pygame.K_a]:
             player.vel_x -= player.speed_increment
-            player_moving = True
+            player.moving += 1
 
         if keys[pygame.K_d]:
             player.vel_x += player.speed_increment
-            player_moving = True
+            player.moving += 1
+        
+        if player.moving > 1:
+            player.vel_x = max(min(player.vel_x,player.diagonal_speed),-player.diagonal_speed)
+            player.vel_y = max(min(player.vel_y,player.diagonal_speed),-player.diagonal_speed)
 
         player.vel_x = max(min(player.vel_x,player.max_speed),-player.max_speed)
         player.vel_y = max(min(player.vel_y,player.max_speed),-player.max_speed)
@@ -171,6 +181,8 @@ def main():
         player.vel_y *= player.drag
         
         
+        player.x = min(max(0,player.x), world.width -player.height)
+        player.y = min(max(0,player.y), world.height-player.height)
 #------------------------------------
 
 #--------------Draw everything----------------
@@ -180,7 +192,7 @@ def main():
         world.surface.blit(enemy.surface,(enemy.x,enemy.y))
         world.surface.blit(player.surface,(player.x,player.y))
 
-        camera.update(player.x+player.width//2, player.y+player.height//2, player.max_speed)
+        camera.update(player.x+player.width//2, player.y+player.height//2, player.max_speed, world)
 
         screen.blit(world.surface,(0,0),camera.rect)
         
@@ -194,3 +206,4 @@ def main():
 main()
 pygame.quit()
 sys.exit()
+
